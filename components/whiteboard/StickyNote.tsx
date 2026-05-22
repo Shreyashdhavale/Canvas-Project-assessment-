@@ -48,11 +48,11 @@ export default function StickyNoteCard({
   const resizeStateRef = useRef<ResizeState | null>(null)
 
   useEffect(() => {
-    const handleMouseMove = (event: MouseEvent) => {
+    const handleMove = (clientX: number, clientY: number) => {
       if (dragStateRef.current) {
         const { startX, startY, startLeft, startTop } = dragStateRef.current
-        const deltaX = (event.clientX - startX) / zoom
-        const deltaY = (event.clientY - startY) / zoom
+        const deltaX = (clientX - startX) / zoom
+        const deltaY = (clientY - startY) / zoom
 
         onUpdate(note.id, {
           x: startLeft + deltaX,
@@ -62,14 +62,24 @@ export default function StickyNoteCard({
 
       if (resizeStateRef.current) {
         const { startX, startY, startWidth, startHeight } = resizeStateRef.current
-        const deltaX = (event.clientX - startX) / zoom
-        const deltaY = (event.clientY - startY) / zoom
+        const deltaX = (clientX - startX) / zoom
+        const deltaY = (clientY - startY) / zoom
 
         onUpdate(note.id, {
           width: Math.max(MIN_NOTE_WIDTH, startWidth + deltaX),
           height: Math.max(MIN_NOTE_HEIGHT, startHeight + deltaY),
         })
       }
+    }
+
+    const handleMouseMove = (event: MouseEvent) => {
+      handleMove(event.clientX, event.clientY)
+    }
+
+    const handleTouchMove = (event: TouchEvent) => {
+      if (event.touches.length !== 1) return
+      const touch = event.touches[0]
+      handleMove(touch.clientX, touch.clientY)
     }
 
     const endInteraction = () => {
@@ -81,21 +91,23 @@ export default function StickyNoteCard({
 
     window.addEventListener("mousemove", handleMouseMove)
     window.addEventListener("mouseup", endInteraction)
+    window.addEventListener("touchmove", handleTouchMove, { passive: false })
+    window.addEventListener("touchend", endInteraction)
 
     return () => {
       window.removeEventListener("mousemove", handleMouseMove)
       window.removeEventListener("mouseup", endInteraction)
+      window.removeEventListener("touchmove", handleTouchMove)
+      window.removeEventListener("touchend", endInteraction)
     }
   }, [note.id, onUpdate, zoom])
 
-  const handleDragMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    event.stopPropagation()
+  const handleDragStart = (clientX: number, clientY: number) => {
     onSelect(note.id)
 
     dragStateRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
+      startX: clientX,
+      startY: clientY,
       startLeft: note.x,
       startTop: note.y,
     }
@@ -104,20 +116,46 @@ export default function StickyNoteCard({
     document.body.style.cursor = "grabbing"
   }
 
-  const handleResizeMouseDown = (event: React.MouseEvent<HTMLButtonElement>) => {
+  const handleDragMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     event.preventDefault()
     event.stopPropagation()
+    handleDragStart(event.clientX, event.clientY)
+  }
+
+  const handleDragTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (event.touches.length !== 1) return
+    const touch = event.touches[0]
+    handleDragStart(touch.clientX, touch.clientY)
+  }
+
+  const handleResizeStart = (clientX: number, clientY: number) => {
     onSelect(note.id)
 
     resizeStateRef.current = {
-      startX: event.clientX,
-      startY: event.clientY,
+      startX: clientX,
+      startY: clientY,
       startWidth: note.width,
       startHeight: note.height,
     }
 
     document.body.style.userSelect = "none"
     document.body.style.cursor = "nwse-resize"
+  }
+
+  const handleResizeMouseDown = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    handleResizeStart(event.clientX, event.clientY)
+  }
+
+  const handleResizeTouchStart = (event: React.TouchEvent<HTMLButtonElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    if (event.touches.length !== 1) return
+    const touch = event.touches[0]
+    handleResizeStart(touch.clientX, touch.clientY)
   }
 
   return (
@@ -143,6 +181,7 @@ export default function StickyNoteCard({
       <div
         className="flex h-9 cursor-grab items-center rounded-t-2xl border-b border-black/10 px-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 active:cursor-grabbing"
         onMouseDown={handleDragMouseDown}
+        onTouchStart={handleDragTouchStart}
       >
         Sticky note
       </div>
@@ -187,6 +226,7 @@ export default function StickyNoteCard({
           aria-label="Resize sticky note"
           className="h-4 w-4 cursor-nwse-resize rounded-full border border-slate-900/20 bg-white/70 shadow-sm"
           onMouseDown={handleResizeMouseDown}
+          onTouchStart={handleResizeTouchStart}
         />
       </div>
     </div>
