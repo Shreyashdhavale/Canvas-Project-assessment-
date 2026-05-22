@@ -178,7 +178,6 @@ export default function StickyNoteCard({
         event.stopPropagation()
         onSelect(note.id)
       }}
-      onWheel={(event) => event.stopPropagation()}
     >
       {/* Activity Indicator */}
       <ActivityIndicator itemType="note" itemName={note.text.slice(0, 20) || "Untitled"} />

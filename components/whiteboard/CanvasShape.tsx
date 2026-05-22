@@ -221,7 +221,6 @@ export default function CanvasShapeCard({
         event.stopPropagation()
         onSelect(shape.id)
       }}
-      onWheel={(event) => event.stopPropagation()}
     >
       {/* Activity Indicator */}
       {!draft && (
