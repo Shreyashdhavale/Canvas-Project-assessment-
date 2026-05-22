@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import { StickyNote } from "@/types/board"
+import ActivityIndicator from "./ActivityIndicator"
 
 type DragState = {
   startX: number
@@ -160,6 +161,7 @@ export default function StickyNoteCard({
 
   return (
     <div
+      data-note-id={note.id}
       className={`absolute rounded-2xl border shadow-xl transition-shadow ${
         selected ? "border-slate-900 shadow-2xl" : "border-black/10"
       } ${
@@ -178,6 +180,9 @@ export default function StickyNoteCard({
       }}
       onWheel={(event) => event.stopPropagation()}
     >
+      {/* Activity Indicator */}
+      <ActivityIndicator itemType="note" itemName={note.text.slice(0, 20) || "Untitled"} />
+
       <div
         className="flex h-9 cursor-grab items-center rounded-t-2xl border-b border-black/10 px-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-700 active:cursor-grabbing"
         onMouseDown={handleDragMouseDown}

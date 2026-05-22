@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import { CanvasShape } from "@/types/board"
+import ActivityIndicator from "./ActivityIndicator"
 
 type DragState = {
   startX: number
@@ -207,6 +208,7 @@ export default function CanvasShapeCard({
 
   return (
     <div
+      data-shape-id={shape.id}
       className={`absolute ${draft ? "pointer-events-none" : ""} ${animateBorder ? "animate-shape-border" : ""}`}
       style={{
         left: box.x,
@@ -221,6 +223,15 @@ export default function CanvasShapeCard({
       }}
       onWheel={(event) => event.stopPropagation()}
     >
+      {/* Activity Indicator */}
+      {!draft && (
+        <ActivityIndicator
+          itemType="shape"
+          itemName={shape.type.charAt(0).toUpperCase() + shape.type.slice(1)}
+          itemId={shape.id}
+        />
+      )}
+
       {isLine ? (
         <svg
           className="absolute inset-0 h-full w-full overflow-visible"

@@ -6,6 +6,12 @@ import InfiniteGrid from "./InfiniteGrid"
 import StickyNoteCard from "./StickyNote"
 import CanvasShapeCard from "./CanvasShape"
 import Toolbar from "./Toolbar"
+import CollaborationPanel from "./CollaborationPanel"
+import UserCursors from "./UserCursors"
+import CursorLayer from "./CursorLayer"
+import PresenceList from "./PresenceList"
+import EditingIndicators from "./EditingIndicators"
+import { useCollaborationSimulation } from "./useCollaboration"
 import { CanvasShape, ShapeKind, StickyNote } from "@/types/board"
 
 const STORAGE_KEY = "canvas-app.board-state"
@@ -65,6 +71,9 @@ const createDraftShape = (
 }
 
 export default function Canvas() {
+  // Start collaboration simulation on mount
+  useCollaborationSimulation(true)
+
   const {
     viewport,
     notes,
@@ -250,7 +259,7 @@ export default function Canvas() {
           stroke: SHAPE_STROKE,
           fill: "transparent",
           strokeWidth: 3,
-        })
+        } as Omit<CanvasShape, "id">)
 
         // Reset tool after drawing one shape
         setActiveShapeTool(null)
@@ -272,7 +281,7 @@ export default function Canvas() {
         stroke: SHAPE_STROKE,
         fill: SHAPE_FILL,
         strokeWidth: 3,
-      })
+      } as Omit<CanvasShape, "id">)
 
       // Reset tool after drawing one shape
       setActiveShapeTool(null)
@@ -471,7 +480,7 @@ export default function Canvas() {
       if (
         activeElement instanceof HTMLTextAreaElement ||
         activeElement instanceof HTMLInputElement ||
-        activeElement?.isContentEditable
+        (activeElement instanceof HTMLElement && activeElement.isContentEditable)
       ) {
         return
       }
@@ -542,10 +551,9 @@ export default function Canvas() {
 
           if (clipboardShapeRef.current) {
             const offset = 24
-            let newShapeData: Omit<CanvasShape, "id">
 
             if (clipboardShapeRef.current.type === "line") {
-              newShapeData = {
+              const newShapeData: Omit<Extract<CanvasShape, { type: "line" }>, "id"> = {
                 type: "line",
                 x1: clipboardShapeRef.current.x1 + offset,
                 y1: clipboardShapeRef.current.y1 + offset,
@@ -555,8 +563,10 @@ export default function Canvas() {
                 fill: clipboardShapeRef.current.fill,
                 strokeWidth: clipboardShapeRef.current.strokeWidth,
               }
+
+              addShape(newShapeData)
             } else {
-              newShapeData = {
+              const newShapeData: Omit<Exclude<CanvasShape, { type: "line" }>, "id"> = {
                 type: clipboardShapeRef.current.type,
                 x: clipboardShapeRef.current.x + offset,
                 y: clipboardShapeRef.current.y + offset,
@@ -566,9 +576,9 @@ export default function Canvas() {
                 fill: clipboardShapeRef.current.fill,
                 strokeWidth: clipboardShapeRef.current.strokeWidth,
               }
-            }
 
-            addShape(newShapeData)
+              addShape(newShapeData)
+            }
           }
 
           return
@@ -663,6 +673,15 @@ export default function Canvas() {
         onCenterView={handleCenterView}
         hasSelectedItem={hasSelectedItem}
       />
+
+      {/* SaaS-Style Collaboration UI */}
+      <PresenceList />
+      <CursorLayer />
+      <EditingIndicators />
+
+      {/* Legacy Collaboration Panel (optional) */}
+      {/* <CollaborationPanel /> */}
+      {/* <UserCursors /> */}
 
       {/* GRID */}
       <InfiniteGrid />

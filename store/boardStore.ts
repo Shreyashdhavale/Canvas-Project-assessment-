@@ -32,7 +32,7 @@ type BoardState = {
 const createShapeId = () =>
   `shape-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
-const offsetShape = (shape: CanvasShape, offset = 24): Omit<CanvasShape, "id"> => {
+const offsetShape = (shape: CanvasShape, offset = 24) => {
   if (shape.type === "line") {
     return {
       type: "line",
@@ -132,16 +132,10 @@ export const useBoardStore = create<BoardState>((set, get) => ({
 
   addShape: (shape) => {
     const shapeId = createShapeId()
-    const newShape: CanvasShape =
-      shape.type === "line"
-        ? {
-            ...shape,
-            id: shapeId,
-          }
-        : {
-            ...shape,
-            id: shapeId,
-          }
+    const newShape = {
+      ...shape,
+      id: shapeId,
+    } as CanvasShape
 
     set((state) => ({
       shapes: [
