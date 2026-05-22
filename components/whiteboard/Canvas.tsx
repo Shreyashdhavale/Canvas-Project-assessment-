@@ -1,15 +1,33 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useBoardStore } from "@/store/boardStore"
 import InfiniteGrid from "./InfiniteGrid"
+import StickyNoteCard from "./StickyNote"
+import { StickyNote } from "@/types/board"
+
+const STORAGE_KEY = "canvas-app.sticky-notes"
 
 export default function Canvas() {
-  const { viewport, setViewport } = useBoardStore()
+  const {
+    viewport,
+    notes,
+    selectedNoteId,
+    setViewport,
+    setNotes,
+    addNote,
+    updateNote,
+    removeNote,
+    selectNote,
+  } = useBoardStore()
 
   const canvasRef = useRef<HTMLDivElement>(null)
+  const clipboardNoteRef = useRef<StickyNote | null>(null)
+  const hasHydratedRef = useRef(false)
+  const copiedNoteIdRef = useRef<string | null>(null)
 
   const [isPanning, setIsPanning] = useState(false)
+  const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null)
 
   const lastPoint = useRef({
     x: 0,
@@ -91,6 +109,115 @@ export default function Canvas() {
     })
   }
 
+  const createStickyNote = () => {
+    const rect = canvasRef.current?.getBoundingClientRect()
+
+    const worldCenterX = rect
+      ? (rect.width / 2 - viewport.x) / viewport.zoom
+      : 0
+    const worldCenterY = rect
+      ? (rect.height / 2 - viewport.y) / viewport.zoom
+      : 0
+
+    addNote({
+      x: worldCenterX - 120,
+      y: worldCenterY - 90,
+    })
+  }
+
+  useEffect(() => {
+    try {
+      const savedNotes = window.localStorage.getItem(STORAGE_KEY)
+
+      if (savedNotes) {
+        const parsedNotes = JSON.parse(savedNotes) as StickyNote[]
+        setNotes(Array.isArray(parsedNotes) ? parsedNotes : [])
+      }
+    } catch {
+      setNotes([])
+    } finally {
+      hasHydratedRef.current = true
+    }
+  }, [setNotes])
+
+  useEffect(() => {
+    if (!hasHydratedRef.current) return
+
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(notes))
+  }, [notes])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const activeElement = document.activeElement
+
+      if (
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLInputElement ||
+        activeElement?.isContentEditable
+      ) {
+        return
+      }
+
+      const selectedNote = notes.find((note) => note.id === selectedNoteId)
+
+      if (!selectedNote) return
+
+      const isModifier = event.ctrlKey || event.metaKey
+      const key = event.key.toLowerCase()
+
+      if (isModifier && key === "c") {
+        event.preventDefault()
+        clipboardNoteRef.current = selectedNote
+        copiedNoteIdRef.current = selectedNote.id
+        setCopiedNoteId(selectedNote.id)
+        return
+      }
+
+      if (isModifier && key === "x") {
+        event.preventDefault()
+        clipboardNoteRef.current = selectedNote
+        removeNote(selectedNote.id)
+        return
+      }
+
+      if (isModifier && key === "v") {
+        event.preventDefault()
+
+        if (clipboardNoteRef.current) {
+          addNote({
+            ...clipboardNoteRef.current,
+            x: clipboardNoteRef.current.x + 24,
+            y: clipboardNoteRef.current.y + 24,
+          })
+        }
+
+        return
+      }
+
+      if (event.key === "Delete" || event.key === "Backspace") {
+        event.preventDefault()
+        removeNote(selectedNote.id)
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [addNote, notes, removeNote, selectedNoteId])
+
+  useEffect(() => {
+    if (!copiedNoteId) return
+
+    const timeout = window.setTimeout(() => {
+      if (copiedNoteIdRef.current === copiedNoteId) {
+        copiedNoteIdRef.current = null
+        setCopiedNoteId(null)
+      }
+    }, 1400)
+
+    return () => window.clearTimeout(timeout)
+  }, [copiedNoteId])
+
   return (
     <div
       ref={canvasRef}
@@ -101,6 +228,19 @@ export default function Canvas() {
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
     >
+      <div
+        className="absolute left-4 top-4 z-30 flex items-center gap-3 rounded-2xl border border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800"
+          onClick={createStickyNote}
+        >
+          Add Sticky Note
+        </button>
+      </div>
+
       {/* GRID */}
       <InfiniteGrid />
 
@@ -115,7 +255,17 @@ export default function Canvas() {
           transformOrigin: "0 0",
         }}
       >
-        <div className="absolute left-[400px] top-[300px] h-40 w-40 rounded-xl bg-blue-500 shadow-xl" />
+        {notes.map((note) => (
+          <StickyNoteCard
+            key={note.id}
+            note={note}
+            zoom={viewport.zoom}
+            selected={selectedNoteId === note.id}
+            animateBorder={copiedNoteId === note.id}
+            onSelect={selectNote}
+            onUpdate={updateNote}
+          />
+        ))}
       </div>
     </div>
   )
