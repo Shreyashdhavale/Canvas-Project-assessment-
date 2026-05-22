@@ -83,7 +83,7 @@ export default function Canvas() {
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault()
 
-    const zoomSpeed = 0.1
+    const zoomFactor = 1 - e.deltaY * 0.0015
 
     const rect = canvasRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 }
     const offsetX = e.clientX - rect.left
@@ -91,7 +91,7 @@ export default function Canvas() {
 
     const oldZoom = viewport.zoom
 
-    let newZoom = e.deltaY > 0 ? oldZoom - zoomSpeed : oldZoom + zoomSpeed
+    let newZoom = oldZoom * zoomFactor
     newZoom = Math.min(Math.max(newZoom, 0.2), 4)
 
     // World coordinates under the cursor before zoom

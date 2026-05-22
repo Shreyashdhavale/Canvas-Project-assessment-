@@ -28,6 +28,13 @@ type StickyNoteProps = {
 
 const MIN_NOTE_WIDTH = 180
 const MIN_NOTE_HEIGHT = 140
+const NOTE_COLORS = [
+  "#fef3c7",
+  "#dbeafe",
+  "#dcfce7",
+  "#fce7f3",
+  "#fee2e2",
+]
 
 export default function StickyNoteCard({
   note,
@@ -141,7 +148,7 @@ export default function StickyNoteCard({
       </div>
 
       <textarea
-        className="h-[calc(100%-2.25rem)] w-full resize-none bg-transparent px-3 py-2 text-sm leading-5 text-slate-900 outline-none"
+        className="h-[calc(100%-5.25rem)] w-full resize-none bg-transparent px-3 py-2 text-sm leading-5 text-slate-900 outline-none"
         value={note.text}
         onChange={(event) => onUpdate(note.id, { text: event.target.value })}
         onFocus={() => onSelect(note.id)}
@@ -152,12 +159,36 @@ export default function StickyNoteCard({
         spellCheck={false}
       />
 
-      <button
-        type="button"
-        aria-label="Resize sticky note"
-        className="absolute bottom-1 right-1 h-4 w-4 cursor-nwse-resize rounded-full border border-slate-900/20 bg-white/70 shadow-sm"
-        onMouseDown={handleResizeMouseDown}
-      />
+      <div
+        className="flex items-center justify-between gap-2 border-t border-black/10 px-3 py-2"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center gap-2">
+          {NOTE_COLORS.map((color) => (
+            <button
+              key={color}
+              type="button"
+              aria-label={`Change sticky note color to ${color}`}
+              className={`h-5 w-5 rounded-full border transition-transform hover:scale-110 ${
+                note.color === color ? "border-slate-900 ring-2 ring-slate-900/30" : "border-black/10"
+              }`}
+              style={{ backgroundColor: color }}
+              onClick={() => onUpdate(note.id, { color })}
+              onMouseDown={(event) => {
+                event.stopPropagation()
+                onSelect(note.id)
+              }}
+            />
+          ))}
+        </div>
+
+        <button
+          type="button"
+          aria-label="Resize sticky note"
+          className="h-4 w-4 cursor-nwse-resize rounded-full border border-slate-900/20 bg-white/70 shadow-sm"
+          onMouseDown={handleResizeMouseDown}
+        />
+      </div>
     </div>
   )
 }
