@@ -86,3 +86,7 @@ npm run dev
 - Add item virtualization for large canvases.
 - Add better shape tools and grouping.
 - Add cloud persistence and shared documents.
+
+##Demo
+<img width="1915" height="873" alt="image" src="https://github.com/user-attachments/assets/45e8ad9e-7afa-47bd-9425-e489c57582b8" />
+
