@@ -22,53 +22,17 @@ type BoardStorageState = {
   shapes?: CanvasShape[]
 }
 
-type DraftShapeState = {
-  tool: ShapeKind
-  startX: number
-  startY: number
+type BoardHistorySnapshot = {
+  notes: StickyNote[]
+  shapes: CanvasShape[]
 }
 
 const SHAPE_STROKE = "#334155"
 const SHAPE_FILL = "rgba(148, 163, 184, 0.18)"
-
-const createDraftShape = (
-  tool: ShapeKind,
-  startX: number,
-  startY: number,
-  endX: number,
-  endY: number,
-): CanvasShape => {
-  if (tool === "line") {
-    return {
-      id: "draft-shape",
-      type: "line",
-      x1: startX,
-      y1: startY,
-      x2: endX,
-      y2: endY,
-      stroke: SHAPE_STROKE,
-      fill: "transparent",
-      strokeWidth: 3,
-    }
-  }
-
-  const x = Math.min(startX, endX)
-  const y = Math.min(startY, endY)
-  const width = Math.abs(endX - startX)
-  const height = Math.abs(endY - startY)
-
-  return {
-    id: "draft-shape",
-    type: tool,
-    x,
-    y,
-    width,
-    height,
-    stroke: SHAPE_STROKE,
-    fill: SHAPE_FILL,
-    strokeWidth: 3,
-  }
-}
+const DEFAULT_RECTANGLE_WIDTH = 220
+const DEFAULT_RECTANGLE_HEIGHT = 140
+const DEFAULT_CIRCLE_SIZE = 160
+const DEFAULT_LINE_LENGTH = 180
 
 export default function Canvas() {
   // Start collaboration simulation on mount
@@ -78,8 +42,6 @@ export default function Canvas() {
     viewport,
     notes,
     shapes,
-    selectedNoteId,
-    selectedShapeId,
     setViewport,
     setNotes,
     setShapes,
@@ -96,17 +58,25 @@ export default function Canvas() {
   const canvasRef = useRef<HTMLDivElement>(null)
   const clipboardNoteRef = useRef<StickyNote | null>(null)
   const clipboardShapeRef = useRef<CanvasShape | null>(null)
+  const clipboardShapesRef = useRef<CanvasShape[]>([])
   const hasHydratedRef = useRef(false)
+  const hasHistoryInitializedRef = useRef(false)
   const copiedNoteIdRef = useRef<string | null>(null)
   const copiedShapeIdRef = useRef<string | null>(null)
   const viewportRef = useRef(viewport)
-  const shapeDraftRef = useRef<DraftShapeState | null>(null)
+  const undoStackRef = useRef<BoardHistorySnapshot[]>([])
+  const redoStackRef = useRef<BoardHistorySnapshot[]>([])
+  const isApplyingHistoryRef = useRef(false)
+  const historyCommitTimeoutRef = useRef<number | null>(null)
+  const lastSnapshotKeyRef = useRef("")
 
   const [isPanning, setIsPanning] = useState(false)
   const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null)
   const [copiedShapeId, setCopiedShapeId] = useState<string | null>(null)
   const [activeShapeTool, setActiveShapeTool] = useState<ShapeKind | null>(null)
-  const [draftShape, setDraftShape] = useState<CanvasShape | null>(null)
+  const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([])
+  const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([])
+  const [, setHistoryVersion] = useState(0)
   const toolbarRef = useRef<HTMLDivElement>(null)
 
   const lastPoint = useRef({
@@ -114,26 +84,214 @@ export default function Canvas() {
     y: 0,
   })
 
-  const worldPointToShape = (
-    tool: ShapeKind,
-    startX: number,
-    startY: number,
-    endX: number,
-    endY: number,
-  ) => createDraftShape(tool, startX, startY, endX, endY)
-
   useEffect(() => {
     viewportRef.current = viewport
   }, [viewport])
 
-  const getWorldPoint = (clientX: number, clientY: number) => {
-    const rect = canvasRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 }
+  const cloneNotes = (inputNotes: StickyNote[]) => inputNotes.map((note) => ({ ...note }))
+
+  const cloneShapes = (inputShapes: CanvasShape[]) => inputShapes.map((shape) => ({ ...shape }))
+
+  const createSnapshot = (sourceNotes: StickyNote[], sourceShapes: CanvasShape[]): BoardHistorySnapshot => ({
+    notes: cloneNotes(sourceNotes),
+    shapes: cloneShapes(sourceShapes),
+  })
+
+  const getSnapshotKey = (snapshot: BoardHistorySnapshot) => JSON.stringify(snapshot)
+
+  const bumpHistoryVersion = () => {
+    setHistoryVersion((value) => value + 1)
+  }
+
+  const pushSnapshotToUndoStack = (snapshot: BoardHistorySnapshot) => {
+    const snapshotKey = getSnapshotKey(snapshot)
+
+    if (snapshotKey === lastSnapshotKeyRef.current) return
+
+    undoStackRef.current = [...undoStackRef.current, snapshot]
+    if (undoStackRef.current.length > 80) {
+      undoStackRef.current = undoStackRef.current.slice(-80)
+    }
+
+    redoStackRef.current = []
+    lastSnapshotKeyRef.current = snapshotKey
+    bumpHistoryVersion()
+  }
+
+  const applyHistorySnapshot = (snapshot: BoardHistorySnapshot) => {
+    isApplyingHistoryRef.current = true
+    setNotes(cloneNotes(snapshot.notes))
+    setShapes(cloneShapes(snapshot.shapes))
+    clearSelection()
+  }
+
+  const handleUndo = () => {
+    if (undoStackRef.current.length <= 1) return
+
+    const currentSnapshot = undoStackRef.current[undoStackRef.current.length - 1]
+    const previousSnapshot = undoStackRef.current[undoStackRef.current.length - 2]
+
+    undoStackRef.current = undoStackRef.current.slice(0, -1)
+    redoStackRef.current = [...redoStackRef.current, currentSnapshot]
+    lastSnapshotKeyRef.current = getSnapshotKey(previousSnapshot)
+
+    applyHistorySnapshot(previousSnapshot)
+    bumpHistoryVersion()
+  }
+
+  const handleRedo = () => {
+    if (redoStackRef.current.length === 0) return
+
+    const nextSnapshot = redoStackRef.current[redoStackRef.current.length - 1]
+    redoStackRef.current = redoStackRef.current.slice(0, -1)
+    undoStackRef.current = [...undoStackRef.current, nextSnapshot]
+    lastSnapshotKeyRef.current = getSnapshotKey(nextSnapshot)
+
+    applyHistorySnapshot(nextSnapshot)
+    bumpHistoryVersion()
+  }
+
+  const getWorldCenterPoint = () => {
+    const rect = canvasRef.current?.getBoundingClientRect()
     const currentViewport = viewportRef.current
 
-    return {
-      x: (clientX - rect.left - currentViewport.x) / currentViewport.zoom,
-      y: (clientY - rect.top - currentViewport.y) / currentViewport.zoom,
+    if (!rect) {
+      return { x: 0, y: 0 }
     }
+
+    return {
+      x: (rect.width / 2 - currentViewport.x) / currentViewport.zoom,
+      y: (rect.height / 2 - currentViewport.y) / currentViewport.zoom,
+    }
+  }
+
+  const insertShapeAtPoint = (tool: ShapeKind, x: number, y: number) => {
+    if (tool === "line") {
+      const halfLength = DEFAULT_LINE_LENGTH / 2
+
+      const shapeId = addShape({
+        type: "line",
+        x1: x - halfLength,
+        y1: y,
+        x2: x + halfLength,
+        y2: y,
+        stroke: SHAPE_STROKE,
+        fill: "transparent",
+        strokeWidth: 3,
+      } as Omit<CanvasShape, "id">)
+
+      setSelectedShapeIds([shapeId])
+      setSelectedNoteIds([])
+
+      return
+    }
+
+    if (tool === "circle") {
+      const shapeId = addShape({
+        type: "circle",
+        x: x - DEFAULT_CIRCLE_SIZE / 2,
+        y: y - DEFAULT_CIRCLE_SIZE / 2,
+        width: DEFAULT_CIRCLE_SIZE,
+        height: DEFAULT_CIRCLE_SIZE,
+        stroke: SHAPE_STROKE,
+        fill: SHAPE_FILL,
+        strokeWidth: 3,
+      } as Omit<CanvasShape, "id">)
+
+      setSelectedShapeIds([shapeId])
+      setSelectedNoteIds([])
+
+      return
+    }
+
+    const shapeId = addShape({
+      type: "rectangle",
+      x: x - DEFAULT_RECTANGLE_WIDTH / 2,
+      y: y - DEFAULT_RECTANGLE_HEIGHT / 2,
+      width: DEFAULT_RECTANGLE_WIDTH,
+      height: DEFAULT_RECTANGLE_HEIGHT,
+      stroke: SHAPE_STROKE,
+      fill: SHAPE_FILL,
+      strokeWidth: 3,
+    } as Omit<CanvasShape, "id">)
+
+    setSelectedShapeIds([shapeId])
+    setSelectedNoteIds([])
+  }
+
+  const duplicateShapeWithOffset = (shape: CanvasShape, offset: number) => {
+    if (shape.type === "line") {
+      return {
+        type: "line",
+        x1: shape.x1 + offset,
+        y1: shape.y1 + offset,
+        x2: shape.x2 + offset,
+        y2: shape.y2 + offset,
+        stroke: shape.stroke,
+        fill: shape.fill,
+        strokeWidth: shape.strokeWidth,
+      } as Omit<Extract<CanvasShape, { type: "line" }>, "id">
+    }
+
+    return {
+      type: shape.type,
+      x: shape.x + offset,
+      y: shape.y + offset,
+      width: shape.width,
+      height: shape.height,
+      stroke: shape.stroke,
+      fill: shape.fill,
+      strokeWidth: shape.strokeWidth,
+    } as Omit<Exclude<CanvasShape, { type: "line" }>, "id">
+  }
+
+  const clearSelection = () => {
+    setSelectedNoteIds([])
+    setSelectedShapeIds([])
+    selectNote(null)
+    selectShape(null)
+  }
+
+  const handleSelectNote = (noteId: string, additive = false) => {
+    if (!additive) {
+      setSelectedNoteIds([noteId])
+      setSelectedShapeIds([])
+      selectNote(noteId)
+      selectShape(null)
+      return
+    }
+
+    setSelectedShapeIds([])
+    selectShape(null)
+
+    const alreadySelected = selectedNoteIds.includes(noteId)
+    const nextIds = alreadySelected
+      ? selectedNoteIds.filter((id) => id !== noteId)
+      : [...selectedNoteIds, noteId]
+
+    setSelectedNoteIds(nextIds)
+    selectNote(nextIds.length > 0 ? nextIds[nextIds.length - 1] : null)
+  }
+
+  const handleSelectShape = (shapeId: string, additive = false) => {
+    if (!additive) {
+      setSelectedShapeIds([shapeId])
+      setSelectedNoteIds([])
+      selectShape(shapeId)
+      selectNote(null)
+      return
+    }
+
+    setSelectedNoteIds([])
+    selectNote(null)
+
+    const alreadySelected = selectedShapeIds.includes(shapeId)
+    const nextIds = alreadySelected
+      ? selectedShapeIds.filter((id) => id !== shapeId)
+      : [...selectedShapeIds, shapeId]
+
+    setSelectedShapeIds(nextIds)
+    selectShape(nextIds.length > 0 ? nextIds[nextIds.length - 1] : null)
   }
 
   // Extract client X/Y from mouse or touch event
@@ -150,27 +308,8 @@ export default function Canvas() {
   // -----------------------------
 
   const handlePanStart = (clientX: number, clientY: number) => {
-    if (activeShapeTool) {
-      const worldPoint = getWorldPoint(clientX, clientY)
-
-      shapeDraftRef.current = {
-        tool: activeShapeTool,
-        startX: worldPoint.x,
-        startY: worldPoint.y,
-      }
-
-      selectNote(null)
-      selectShape(null)
-      setDraftShape(
-        worldPointToShape(activeShapeTool, worldPoint.x, worldPoint.y, worldPoint.x, worldPoint.y),
-      )
-      return
-    }
-
     setIsPanning(true)
-
-    selectNote(null)
-    selectShape(null)
+    clearSelection()
 
     lastPoint.current = {
       x: clientX,
@@ -221,81 +360,6 @@ export default function Canvas() {
     setIsPanning(false)
   }
 
-  useEffect(() => {
-    const handleMouseMove = (event: MouseEvent) => {
-      if (!shapeDraftRef.current) return
-
-      const currentPoint = getWorldPoint(event.clientX, event.clientY)
-      const { tool, startX, startY } = shapeDraftRef.current
-
-      setDraftShape(
-        worldPointToShape(tool, startX, startY, currentPoint.x, currentPoint.y),
-      )
-    }
-
-    const handleMouseUp = (event: MouseEvent) => {
-      if (!shapeDraftRef.current) return
-
-      const currentPoint = getWorldPoint(event.clientX, event.clientY)
-      const { tool, startX, startY } = shapeDraftRef.current
-      const endX = currentPoint.x
-      const endY = currentPoint.y
-      const deltaX = Math.abs(endX - startX)
-      const deltaY = Math.abs(endY - startY)
-      const minimumSize = 6 / viewportRef.current.zoom
-
-      shapeDraftRef.current = null
-      setDraftShape(null)
-
-      if (tool === "line") {
-        if (deltaX < minimumSize && deltaY < minimumSize) return
-
-        addShape({
-          type: "line",
-          x1: startX,
-          y1: startY,
-          x2: endX,
-          y2: endY,
-          stroke: SHAPE_STROKE,
-          fill: "transparent",
-          strokeWidth: 3,
-        } as Omit<CanvasShape, "id">)
-
-        // Reset tool after drawing one shape
-        setActiveShapeTool(null)
-        return
-      }
-
-      if (deltaX < minimumSize && deltaY < minimumSize) return
-
-      const shapeBox = worldPointToShape(tool, startX, startY, endX, endY)
-
-      if (shapeBox.type === "line") return
-
-      addShape({
-        type: shapeBox.type,
-        x: shapeBox.x,
-        y: shapeBox.y,
-        width: shapeBox.width,
-        height: shapeBox.height,
-        stroke: SHAPE_STROKE,
-        fill: SHAPE_FILL,
-        strokeWidth: 3,
-      } as Omit<CanvasShape, "id">)
-
-      // Reset tool after drawing one shape
-      setActiveShapeTool(null)
-    }
-
-    window.addEventListener("mousemove", handleMouseMove)
-    window.addEventListener("mouseup", handleMouseUp)
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove)
-      window.removeEventListener("mouseup", handleMouseUp)
-    }
-  }, [addShape, activeShapeTool])
-
   // -----------------------------
   // ZOOM
   // -----------------------------
@@ -340,10 +404,13 @@ export default function Canvas() {
       ? (rect.height / 2 - currentViewport.y) / currentViewport.zoom
       : 0
 
-    addNote({
+    const noteId = addNote({
       x: worldCenterX - 120,
       y: worldCenterY - 90,
     })
+
+    setSelectedNoteIds([noteId])
+    setSelectedShapeIds([])
   }
 
   const handleZoomIn = () => {
@@ -365,16 +432,17 @@ export default function Canvas() {
       setNotes([])
       setShapes([])
       setViewport({ x: 0, y: 0, zoom: 1 })
-      selectNote(null)
-      selectShape(null)
+      clearSelection()
     }
   }
 
   const handleDeleteSelected = () => {
-    if (selectedNoteId) {
-      removeNote(selectedNoteId)
-    } else if (selectedShapeId) {
-      removeShape(selectedShapeId)
+    if (selectedNoteIds.length > 0) {
+      selectedNoteIds.forEach((noteId) => removeNote(noteId))
+      clearSelection()
+    } else if (selectedShapeIds.length > 0) {
+      selectedShapeIds.forEach((shapeId) => removeShape(shapeId))
+      clearSelection()
     }
   }
 
@@ -438,7 +506,7 @@ export default function Canvas() {
     })
   }
 
-  const hasSelectedItem = selectedNoteId !== null || selectedShapeId !== null
+  const hasSelectedItem = selectedNoteIds.length > 0 || selectedShapeIds.length > 0
 
   useEffect(() => {
     try {
@@ -474,24 +542,82 @@ export default function Canvas() {
   }, [notes, shapes])
 
   useEffect(() => {
+    if (!hasHydratedRef.current) return
+
+    if (!hasHistoryInitializedRef.current) {
+      const initialSnapshot = createSnapshot(notes, shapes)
+      undoStackRef.current = [initialSnapshot]
+      redoStackRef.current = []
+      lastSnapshotKeyRef.current = getSnapshotKey(initialSnapshot)
+      hasHistoryInitializedRef.current = true
+      bumpHistoryVersion()
+      return
+    }
+
+    if (isApplyingHistoryRef.current) {
+      isApplyingHistoryRef.current = false
+      return
+    }
+
+    if (historyCommitTimeoutRef.current) {
+      window.clearTimeout(historyCommitTimeoutRef.current)
+    }
+
+    historyCommitTimeoutRef.current = window.setTimeout(() => {
+      pushSnapshotToUndoStack(createSnapshot(notes, shapes))
+    }, 150)
+
+    return () => {
+      if (historyCommitTimeoutRef.current) {
+        window.clearTimeout(historyCommitTimeoutRef.current)
+      }
+    }
+  }, [notes, shapes])
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       const activeElement = document.activeElement
-
-      if (
+      const isEditingTextField =
         activeElement instanceof HTMLTextAreaElement ||
         activeElement instanceof HTMLInputElement ||
         (activeElement instanceof HTMLElement && activeElement.isContentEditable)
-      ) {
+
+      if (isEditingTextField) {
         return
       }
 
-      const selectedNote = notes.find((note) => note.id === selectedNoteId)
-      const selectedShape = shapes.find((shape) => shape.id === selectedShapeId)
-
-      if (!selectedNote && !selectedShape) return
-
       const isModifier = event.ctrlKey || event.metaKey
       const key = event.key.toLowerCase()
+
+      if (isModifier && key === "z") {
+        event.preventDefault()
+
+        if (event.shiftKey) {
+          handleRedo()
+        } else {
+          handleUndo()
+        }
+
+        return
+      }
+
+      if (isModifier && key === "y") {
+        event.preventDefault()
+        handleRedo()
+        return
+      }
+
+      const primarySelectedNoteId = selectedNoteIds.length > 0
+        ? selectedNoteIds[selectedNoteIds.length - 1]
+        : null
+      const primarySelectedShapeId = selectedShapeIds.length > 0
+        ? selectedShapeIds[selectedShapeIds.length - 1]
+        : null
+
+      const selectedNote = notes.find((note) => note.id === primarySelectedNoteId)
+      const selectedShape = shapes.find((shape) => shape.id === primarySelectedShapeId)
+
+      if (!selectedNote && !selectedShape) return
 
       if (selectedNote) {
         if (isModifier && key === "c") {
@@ -505,7 +631,8 @@ export default function Canvas() {
         if (isModifier && key === "x") {
           event.preventDefault()
           clipboardNoteRef.current = selectedNote
-          removeNote(selectedNote.id)
+          selectedNoteIds.forEach((noteId) => removeNote(noteId))
+          clearSelection()
           return
         }
 
@@ -513,11 +640,14 @@ export default function Canvas() {
           event.preventDefault()
 
           if (clipboardNoteRef.current) {
-            addNote({
+            const newNoteId = addNote({
               ...clipboardNoteRef.current,
               x: clipboardNoteRef.current.x + 24,
               y: clipboardNoteRef.current.y + 24,
             })
+
+            setSelectedNoteIds([newNoteId])
+            setSelectedShapeIds([])
           }
 
           return
@@ -525,7 +655,8 @@ export default function Canvas() {
 
         if (event.key === "Delete" || event.key === "Backspace") {
           event.preventDefault()
-          removeNote(selectedNote.id)
+          selectedNoteIds.forEach((noteId) => removeNote(noteId))
+          clearSelection()
           return
         }
       }
@@ -533,52 +664,49 @@ export default function Canvas() {
       if (selectedShape) {
         if (isModifier && key === "c") {
           event.preventDefault()
-          clipboardShapeRef.current = selectedShape
-          copiedShapeIdRef.current = selectedShape.id
-          setCopiedShapeId(selectedShape.id)
+          const copiedShapes = shapes.filter((shape) => selectedShapeIds.includes(shape.id))
+
+          clipboardShapesRef.current = copiedShapes
+          clipboardShapeRef.current = copiedShapes.length > 0 ? copiedShapes[copiedShapes.length - 1] : selectedShape
+
+          const copiedPrimaryId = selectedShapeIds.length > 0
+            ? selectedShapeIds[selectedShapeIds.length - 1]
+            : selectedShape.id
+          copiedShapeIdRef.current = copiedPrimaryId
+          setCopiedShapeId(copiedPrimaryId)
           return
         }
 
         if (isModifier && key === "x") {
           event.preventDefault()
-          clipboardShapeRef.current = selectedShape
-          removeShape(selectedShape.id)
+          const copiedShapes = shapes.filter((shape) => selectedShapeIds.includes(shape.id))
+
+          clipboardShapesRef.current = copiedShapes
+          clipboardShapeRef.current = copiedShapes.length > 0 ? copiedShapes[copiedShapes.length - 1] : selectedShape
+          selectedShapeIds.forEach((shapeId) => removeShape(shapeId))
+          clearSelection()
           return
         }
 
         if (isModifier && key === "v") {
           event.preventDefault()
 
-          if (clipboardShapeRef.current) {
+          const shapesToPaste = clipboardShapesRef.current.length > 0
+            ? clipboardShapesRef.current
+            : clipboardShapeRef.current
+              ? [clipboardShapeRef.current]
+              : []
+
+          if (shapesToPaste.length > 0) {
             const offset = 24
+            const nextSelectedShapeIds = shapesToPaste.map((shape) =>
+              addShape(duplicateShapeWithOffset(shape, offset)),
+            )
 
-            if (clipboardShapeRef.current.type === "line") {
-              const newShapeData: Omit<Extract<CanvasShape, { type: "line" }>, "id"> = {
-                type: "line",
-                x1: clipboardShapeRef.current.x1 + offset,
-                y1: clipboardShapeRef.current.y1 + offset,
-                x2: clipboardShapeRef.current.x2 + offset,
-                y2: clipboardShapeRef.current.y2 + offset,
-                stroke: clipboardShapeRef.current.stroke,
-                fill: clipboardShapeRef.current.fill,
-                strokeWidth: clipboardShapeRef.current.strokeWidth,
-              }
-
-              addShape(newShapeData)
-            } else {
-              const newShapeData: Omit<Exclude<CanvasShape, { type: "line" }>, "id"> = {
-                type: clipboardShapeRef.current.type,
-                x: clipboardShapeRef.current.x + offset,
-                y: clipboardShapeRef.current.y + offset,
-                width: clipboardShapeRef.current.width,
-                height: clipboardShapeRef.current.height,
-                stroke: clipboardShapeRef.current.stroke,
-                fill: clipboardShapeRef.current.fill,
-                strokeWidth: clipboardShapeRef.current.strokeWidth,
-              }
-
-              addShape(newShapeData)
-            }
+            setSelectedShapeIds(nextSelectedShapeIds)
+            setSelectedNoteIds([])
+            selectShape(nextSelectedShapeIds[nextSelectedShapeIds.length - 1] ?? null)
+            selectNote(null)
           }
 
           return
@@ -586,7 +714,8 @@ export default function Canvas() {
 
         if (event.key === "Delete" || event.key === "Backspace") {
           event.preventDefault()
-          removeShape(selectedShape.id)
+          selectedShapeIds.forEach((shapeId) => removeShape(shapeId))
+          clearSelection()
           return
         }
       }
@@ -595,7 +724,18 @@ export default function Canvas() {
     window.addEventListener("keydown", handleKeyDown)
 
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [addNote, addShape, notes, removeNote, removeShape, shapes, selectedNoteId, selectedShapeId])
+  }, [
+    addNote,
+    addShape,
+    handleRedo,
+    handleUndo,
+    notes,
+    removeNote,
+    removeShape,
+    selectedNoteIds,
+    selectedShapeIds,
+    shapes,
+  ])
 
   useEffect(() => {
     if (!copiedNoteId) return
@@ -636,8 +776,18 @@ export default function Canvas() {
   }, [])
 
   const chooseShapeTool = (tool: ShapeKind | null) => {
-    setActiveShapeTool(tool)
+    if (!tool) {
+      setActiveShapeTool(null)
+      return
+    }
+
+    const centerPoint = getWorldCenterPoint()
+    insertShapeAtPoint(tool, centerPoint.x, centerPoint.y)
+    setActiveShapeTool(null)
   }
+
+  const canUndo = undoStackRef.current.length > 1
+  const canRedo = redoStackRef.current.length > 0
 
   return (
     <div
@@ -670,6 +820,10 @@ export default function Canvas() {
         onResetZoom={handleResetZoom}
         onResetBoard={handleResetBoard}
         onDeleteSelected={handleDeleteSelected}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={canUndo}
+        canRedo={canRedo}
         onCenterView={handleCenterView}
         hasSelectedItem={hasSelectedItem}
       />
@@ -702,32 +856,21 @@ export default function Canvas() {
             key={shape.id}
             shape={shape}
             zoom={viewport.zoom}
-            selected={selectedShapeId === shape.id}
+            selected={selectedShapeIds.includes(shape.id)}
             animateBorder={copiedShapeId === shape.id}
-            onSelect={selectShape}
+            onSelect={handleSelectShape}
             onUpdate={updateShape}
           />
         ))}
-
-        {draftShape ? (
-          <CanvasShapeCard
-            shape={draftShape}
-            zoom={viewport.zoom}
-            selected={false}
-            draft
-            onSelect={() => undefined}
-            onUpdate={() => undefined}
-          />
-        ) : null}
 
         {notes.map((note) => (
           <StickyNoteCard
             key={note.id}
             note={note}
             zoom={viewport.zoom}
-            selected={selectedNoteId === note.id}
+            selected={selectedNoteIds.includes(note.id)}
             animateBorder={copiedNoteId === note.id}
-            onSelect={selectNote}
+            onSelect={handleSelectNote}
             onUpdate={updateNote}
           />
         ))}

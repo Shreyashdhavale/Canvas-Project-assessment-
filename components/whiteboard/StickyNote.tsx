@@ -23,7 +23,7 @@ type StickyNoteProps = {
   selected: boolean
   animateBorder: boolean
   zoom: number
-  onSelect: (noteId: string) => void
+  onSelect: (noteId: string, additive?: boolean) => void
   onUpdate: (noteId: string, updates: Partial<StickyNote>) => void
 }
 
@@ -103,8 +103,8 @@ export default function StickyNoteCard({
     }
   }, [note.id, onUpdate, zoom])
 
-  const handleDragStart = (clientX: number, clientY: number) => {
-    onSelect(note.id)
+  const handleDragStart = (clientX: number, clientY: number, additive = false) => {
+    onSelect(note.id, additive)
 
     dragStateRef.current = {
       startX: clientX,
@@ -120,7 +120,7 @@ export default function StickyNoteCard({
   const handleDragMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
     event.preventDefault()
     event.stopPropagation()
-    handleDragStart(event.clientX, event.clientY)
+    handleDragStart(event.clientX, event.clientY, event.ctrlKey || event.metaKey)
   }
 
   const handleDragTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
@@ -131,8 +131,8 @@ export default function StickyNoteCard({
     handleDragStart(touch.clientX, touch.clientY)
   }
 
-  const handleResizeStart = (clientX: number, clientY: number) => {
-    onSelect(note.id)
+  const handleResizeStart = (clientX: number, clientY: number, additive = false) => {
+    onSelect(note.id, additive)
 
     resizeStateRef.current = {
       startX: clientX,
@@ -148,7 +148,7 @@ export default function StickyNoteCard({
   const handleResizeMouseDown = (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault()
     event.stopPropagation()
-    handleResizeStart(event.clientX, event.clientY)
+    handleResizeStart(event.clientX, event.clientY, event.ctrlKey || event.metaKey)
   }
 
   const handleResizeTouchStart = (event: React.TouchEvent<HTMLButtonElement>) => {
@@ -176,7 +176,7 @@ export default function StickyNoteCard({
       }}
       onMouseDown={(event) => {
         event.stopPropagation()
-        onSelect(note.id)
+        onSelect(note.id, event.ctrlKey || event.metaKey)
       }}
     >
       {/* Activity Indicator */}
@@ -197,7 +197,7 @@ export default function StickyNoteCard({
         onFocus={() => onSelect(note.id)}
         onMouseDown={(event) => {
           event.stopPropagation()
-          onSelect(note.id)
+          onSelect(note.id, event.ctrlKey || event.metaKey)
         }}
         spellCheck={false}
       />
@@ -219,7 +219,7 @@ export default function StickyNoteCard({
               onClick={() => onUpdate(note.id, { color })}
               onMouseDown={(event) => {
                 event.stopPropagation()
-                onSelect(note.id)
+                onSelect(note.id, event.ctrlKey || event.metaKey)
               }}
             />
           ))}
