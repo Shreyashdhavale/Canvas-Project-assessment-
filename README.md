@@ -1,60 +1,88 @@
-## Setup
+# Project Overview
+
+Live Demo: https://canvas-project-assessment.vercel.app/
+
+## Setup Instructions
 
 ```bash
 npm install
 npm run dev
-
-# Interactive Collaborative Whiteboard (short)
-
-## Tech
-- Next.js, TypeScript, Tailwind, Zustand, Framer Motion
-
-## Features
-- Sticky notes, shapes (rect/circle/line), zoom & pan, local collaboration demo, persistence, undo and redo with keyboard shortcut keys
-
-## Architecture (brief)
-- State: global board store in `store/boardStore.ts` (Zustand); UI state in component locals.
-- Rendering: pan/zoom via one transformed container; items are absolutely positioned inside it.
-- Components: `Canvas` (root), `CanvasShape` / `StickyNote` (item-level drag/resize), small collaboration/toolbar components.
-
-## How drag works (short)
-- Each item captures initial pointer + snapshot in a `useRef`.
-- Global `mousemove` / `touchmove` listeners compute delta, divide by `zoom`, then call `updateShape`/`updateNote` to persist.
-- Drag state is kept in refs to avoid rerenders during pointer moves.
-
-## Performance (short)
-- Memoize items with `React.memo` and pass stable callbacks (`useCallback`).
-- Use `useRef` for transient drag state.
-- Apply pan/zoom on a single container (`transform`) to keep rendering cheap.
-
-## Tradeoffs (short)
-- No virtualization; direct store writes on each pointer move for simplicity and immediate collaboration updates.
-
-
 ```
 
-Files of interest: 
-[components/whiteboard/canvas/Canvas.tsx](components/whiteboard/canvas/Canvastsx#L196), 
-[components/whiteboard/canvas/CanvasShape.tsx](components/whiteboard/canvas/CanvasShapetsx#L59),
-[components/whiteboard/canvas/StickyNote.tsx](components/whiteboard/canvas/StickyNote.tsx#L1), [store/boardStore.ts](store/boardStore.ts#L61)
+## Tech Stack
+
+- Next.js
+- TypeScript
+- Tailwind CSS
+- Zustand
+- dnd-kit
+- Framer Motion
+
+## Project Architecture
+
+- `Canvas` is the main board container and owns viewport, history, selection, and item rendering.
+- `store/boardStore.ts` keeps board data in Zustand so updates stay simple and centralized.
+- `CanvasShape` and `StickyNote` handle drag and resize locally, then push changes back to the store.
+- Collaboration UI lives in small focused components like cursors, presence, and editing indicators.
+
+## Features Implemented
+
+- Sticky notes
+- Shapes: rectangle, circle, and line
+- Pan and zoom
+- Drag, resize, copy, paste, delete, undo, and redo
+- Local collaboration simulation
+- Persistence through browser storage
+
+## Bonus Features
+
+- Keyboard shortcuts
+- Multi-select support
+- Copy/paste duplication with offsets
+- Activity and collaboration indicators
+- Animated UI touches with Framer Motion
+
+## Keyboard Shortcuts
+
+- `Ctrl/Cmd + C` copy
+- `Ctrl/Cmd + X` cut
+- `Ctrl/Cmd + V` paste
+- `Delete` or `Backspace` remove selected items
+- `Ctrl/Cmd + Z` undo
+- `Ctrl/Cmd + Shift + Z` redo
+- `Ctrl/Cmd + Y` redo
+- `Ctrl/Cmd + click` multi select 
 
 
-## Getting Started
+## Key Engineering Decisions
 
-First, run the development server:
+- Used Zustand for direct, lightweight state updates instead of a heavier global state framework.
+- Kept drag state in `useRef` so pointer movement does not trigger rerenders instead of useState.
+- Applied pan/zoom with one transformed wrapper to keep rendering simple.
+- Memoized item components so only changed items rerender.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Challenges Faced
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+- Keeping drag and resize smooth while supporting zoom.
+- Handling mouse and touch input with the same code path.
+- Preserving multi-select state while keeping single-item selection predictable.
+- Making copy/paste work for both single items and multi-selected groups without losing offsets or selection order.
+- Preserving selection, copy/paste, and history state together.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Assumptions Made
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- The whiteboard is a single-user demo with simulated collaboration, not a full multiplayer sync system.
+- Browser storage is enough for persistence in this version.
+
+## Known Limitations
+
+- No real backend sync or CRDT-based collaboration.
+- No item virtualization for very large boards.
+- History and persistence are local to the browser.
+
+## Future Improvements
+
+- Add real-time multiplayer syncing.
+- Add item virtualization for large canvases.
+- Add better shape tools and grouping.
+- Add cloud persistence and shared documents.
