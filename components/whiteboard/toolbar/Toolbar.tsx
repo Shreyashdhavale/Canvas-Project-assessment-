@@ -11,7 +11,6 @@ import {
   Crosshair,
   Trash2,
   RefreshCw,
-  Shapes,
 } from "lucide-react"
 import { ShapeKind } from "@/types/board"
 import ToolbarButton from "./ToolbarButton"
@@ -63,7 +62,6 @@ const Toolbar = forwardRef<HTMLDivElement, ToolbarProps>(
         className="absolute left-1 sm:left-2 md:left-2 lg:left-3 top-1/2 z-30 flex h-auto w-12 sm:w-14 md:w-14 lg:w-16 -translate-y-1/2 flex-col items-center gap-0.5 sm:gap-1 md:gap-1 lg:gap-1.5 rounded-2xl border border-slate-200 bg-white/95 px-1.5 sm:px-2 md:px-2 lg:px-2.5 py-2.5 sm:py-2.5 md:py-3 lg:py-3.5 shadow-lg backdrop-blur"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        {/* Section 1: Creation Tools */}
         <ToolbarButton
           icon={<StickyNote size={16} className="sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6" />}
           label="Add Note"
@@ -72,7 +70,6 @@ const Toolbar = forwardRef<HTMLDivElement, ToolbarProps>(
           title="Add Sticky Note"
         />
 
-        {/* Shapes menu sits flush in the flow */}
         <ShapesMenu
           activeShapeTool={activeShapeTool}
           onSelectShapeTool={onSelectShapeTool}
@@ -80,7 +77,6 @@ const Toolbar = forwardRef<HTMLDivElement, ToolbarProps>(
           onToggle={() => setIsShapesMenuOpen((prev) => !prev)}
         />
 
-        {/* Section 2: Zoom Controls */}
         <ToolbarDivider />
 
         <ToolbarButton
@@ -120,7 +116,6 @@ const Toolbar = forwardRef<HTMLDivElement, ToolbarProps>(
           title="Redo (Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z)"
         />
 
-        {/* Section 3: Navigation */}
         <ToolbarDivider />
 
         <ToolbarButton

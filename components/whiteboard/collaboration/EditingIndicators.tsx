@@ -2,7 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion"
 import { useCollaborationStore } from "@/store/collaborationStore"
-import { useEffect, useMemo } from "react"
+import { useMemo } from "react"
 
 type EditingIndicatorBadgeProps = {
   collaboratorName: string
@@ -36,7 +36,6 @@ type EditingOutlineProps = {
 }
 
 function EditingOutline({ itemId, itemType, color }: EditingOutlineProps) {
-  // Find the DOM element being edited
   const getElement = () => {
     if (itemType === "note") {
       return document.querySelector(`[data-note-id="${itemId}"]`)
@@ -72,7 +71,6 @@ function EditingOutline({ itemId, itemType, color }: EditingOutlineProps) {
 }
 
 export default function EditingIndicators() {
-  // Get raw state and memoize the selector result to prevent infinite loops
   const editingStates = useCollaborationStore((state) => state.editingStates)
   const collaborators = useCollaborationStore((state) => state.collaborators)
 
@@ -95,14 +93,12 @@ export default function EditingIndicators() {
     <AnimatePresence>
       {editingInfo.map((info) => (
         <div key={`${info.collaboratorId}-${info.itemId}`}>
-          {/* Selection outline */}
           <EditingOutline
             itemId={info.itemId}
             itemType={info.itemType}
             color={info.color}
           />
 
-          {/* Editing badge */}
           <EditingIndicatorBadge
             collaboratorName={info.collaboratorName}
             color={info.color}

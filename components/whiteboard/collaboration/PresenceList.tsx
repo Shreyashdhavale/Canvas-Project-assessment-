@@ -34,7 +34,6 @@ AvatarBadge.displayName = "AvatarBadge"
 export default function PresenceList() {
   const collaborators = useCollaborationStore((state) => state.collaborators)
 
-  // Memoize selector result to prevent infinite loops
   const activeCollaborators = useMemo(
     () =>
       collaborators
@@ -50,7 +49,6 @@ export default function PresenceList() {
 
   return (
     <div className="absolute right-4 top-4 z-40 flex items-center gap-2">
-      {/* Count badge */}
       <motion.div
         className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white shadow-lg"
         initial={{ opacity: 0, scale: 0.8 }}
@@ -59,7 +57,6 @@ export default function PresenceList() {
         {activeCollaborators.length} editing
       </motion.div>
 
-      {/* Avatars with stagger animation */}
       <motion.div className="flex gap-2" layout>
         {activeCollaborators.map((collaborator, index) => (
           <motion.div

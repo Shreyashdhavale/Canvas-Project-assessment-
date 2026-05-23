@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { memo, useEffect, useRef } from "react"
 import { CanvasShape } from "@/types/board"
-import ActivityIndicator from "./ActivityIndicator"
+import ActivityIndicator from "../collaboration/ActivityIndicator"
 
 type DragState = {
   startX: number
@@ -47,7 +47,7 @@ function getShapeBox(shape: CanvasShape) {
   }
 }
 
-export default function CanvasShapeCard({
+function CanvasShapeCard({
   shape,
   selected,
   draft = false,
@@ -203,7 +203,6 @@ export default function CanvasShapeCard({
         height: Math.max(box.height, isLine ? MIN_LINE_SIZE : MIN_BOX_SIZE),
       }}
     >
-      {/* Activity Indicator */}
       {!draft && (
         <ActivityIndicator
           itemType="shape"
@@ -345,3 +344,5 @@ export default function CanvasShapeCard({
     </div>
   )
 }
+
+export default memo(CanvasShapeCard)

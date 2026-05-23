@@ -1,17 +1,15 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useBoardStore } from "@/store/boardStore"
 import InfiniteGrid from "./InfiniteGrid"
 import StickyNoteCard from "./StickyNote"
 import CanvasShapeCard from "./CanvasShape"
-import Toolbar from "./Toolbar"
-import CollaborationPanel from "./CollaborationPanel"
-import UserCursors from "./UserCursors"
-import CursorLayer from "./CursorLayer"
-import PresenceList from "./PresenceList"
-import EditingIndicators from "./EditingIndicators"
-import { useCollaborationSimulation } from "./useCollaboration"
+import Toolbar from "../toolbar/Toolbar"
+import CursorLayer from "../collaboration/CursorLayer"
+import PresenceList from "../collaboration/PresenceList"
+import EditingIndicators from "../collaboration/EditingIndicators"
+import { useCollaborationSimulation } from "../collaboration/useCollaboration"
 import { CanvasShape, ShapeKind, StickyNote } from "@/types/board"
 
 const STORAGE_KEY = "canvas-app.board-state"
@@ -46,7 +44,6 @@ const DEFAULT_CIRCLE_SIZE = 160
 const DEFAULT_LINE_LENGTH = 180
 
 export default function Canvas() {
-  // Start collaboration simulation on mount
   useCollaborationSimulation(true)
 
   const {
@@ -87,6 +84,10 @@ export default function Canvas() {
   const [activeShapeTool, setActiveShapeTool] = useState<ShapeKind | null>(null)
   const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([])
   const [selectedShapeIds, setSelectedShapeIds] = useState<string[]>([])
+  const [historyAvailability, setHistoryAvailability] = useState({
+    canUndo: false,
+    canRedo: false,
+  })
   const [, setHistoryVersion] = useState(0)
   const toolbarRef = useRef<HTMLDivElement>(null)
 
@@ -112,6 +113,10 @@ export default function Canvas() {
   const getSnapshotKey = (snapshot: BoardHistorySnapshot) => JSON.stringify(snapshot)
 
   const bumpHistoryVersion = () => {
+    setHistoryAvailability({
+      canUndo: undoStackRef.current.length > 1,
+      canRedo: redoStackRef.current.length > 0,
+    })
     setHistoryVersion((value) => value + 1)
   }
 
@@ -277,7 +282,7 @@ export default function Canvas() {
     selectShape(null)
   }
 
-  const handleSelectNote = (noteId: string, additive = false) => {
+  const handleSelectNote = useCallback((noteId: string, additive = false) => {
     if (!additive) {
       setSelectedNoteIds([noteId])
       setSelectedShapeIds([])
@@ -296,9 +301,9 @@ export default function Canvas() {
 
     setSelectedNoteIds(nextIds)
     selectNote(nextIds.length > 0 ? nextIds[nextIds.length - 1] : null)
-  }
+  }, [selectNote, selectedNoteIds])
 
-  const handleSelectShape = (shapeId: string, additive = false) => {
+  const handleSelectShape = useCallback((shapeId: string, additive = false) => {
     if (!additive) {
       setSelectedShapeIds([shapeId])
       setSelectedNoteIds([])
@@ -317,9 +322,8 @@ export default function Canvas() {
 
     setSelectedShapeIds(nextIds)
     selectShape(nextIds.length > 0 ? nextIds[nextIds.length - 1] : null)
-  }
+  }, [selectNote, selectShape, selectedShapeIds])
 
-  // Extract client X/Y from mouse or touch event
   const getClientPoint = (e: React.MouseEvent | React.TouchEvent) => {
     if ("clientX" in e) {
       return { x: e.clientX, y: e.clientY }
@@ -327,10 +331,6 @@ export default function Canvas() {
     const touch = (e as React.TouchEvent).touches[0]
     return { x: touch.clientX, y: touch.clientY }
   }
-
-  // -----------------------------
-  // PAN START
-  // -----------------------------
 
   const handlePanStart = (clientX: number, clientY: number) => {
     setIsPanning(true)
@@ -375,10 +375,6 @@ export default function Canvas() {
     }
   }
 
-  // -----------------------------
-  // PAN MOVE
-  // -----------------------------
-
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isPanning) return
 
@@ -397,10 +393,6 @@ export default function Canvas() {
       y: e.clientY,
     }
   }
-
-  // -----------------------------
-  // PAN END
-  // -----------------------------
 
   const handleMouseUp = () => {
     setIsPanning(false)
@@ -463,10 +455,6 @@ export default function Canvas() {
     handleMouseUp()
   }
 
-  // -----------------------------
-  // ZOOM
-  // -----------------------------
-
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault()
 
@@ -481,11 +469,9 @@ export default function Canvas() {
     let newZoom = oldZoom * zoomFactor
     newZoom = Math.min(Math.max(newZoom, 0.2), 4)
 
-    // World coordinates under the cursor before zoom
     const worldX = (offsetX - viewport.x) / oldZoom
     const worldY = (offsetY - viewport.y) / oldZoom
 
-    // Compute new viewport so that the world point stays under the cursor
     const newX = offsetX - worldX * newZoom
     const newY = offsetY - worldY * newZoom
 
@@ -889,8 +875,8 @@ export default function Canvas() {
     setActiveShapeTool(null)
   }
 
-  const canUndo = undoStackRef.current.length > 1
-  const canRedo = redoStackRef.current.length > 0
+  const canUndo = historyAvailability.canUndo
+  const canRedo = historyAvailability.canRedo
 
   return (
     <div
@@ -924,7 +910,6 @@ export default function Canvas() {
         hasSelectedItem={hasSelectedItem}
       />
 
-      {/* SaaS-Style Collaboration UI */}
       <PresenceList />
       <CursorLayer />
       <EditingIndicators />
@@ -933,10 +918,8 @@ export default function Canvas() {
       {/* <CollaborationPanel /> */}
       {/* <UserCursors /> */}
 
-      {/* GRID */}
       <InfiniteGrid />
 
-      {/* WORLD */}
       <div
         className="absolute inset-0"
         style={{

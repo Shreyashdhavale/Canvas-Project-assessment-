@@ -1,8 +1,8 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { memo, useEffect, useRef } from "react"
 import { StickyNote } from "@/types/board"
-import ActivityIndicator from "./ActivityIndicator"
+import ActivityIndicator from "../collaboration/ActivityIndicator"
 
 type DragState = {
   startX: number
@@ -29,15 +29,9 @@ type StickyNoteProps = {
 
 const MIN_NOTE_WIDTH = 180
 const MIN_NOTE_HEIGHT = 140
-const NOTE_COLORS = [
-  "#fef3c7",
-  "#dbeafe",
-  "#dcfce7",
-  "#fce7f3",
-  "#fee2e2",
-]
+const NOTE_COLORS = ["#fef3c7", "#dbeafe", "#dcfce7", "#fce7f3", "#fee2e2"]
 
-export default function StickyNoteCard({
+function StickyNoteCard({
   note,
   selected,
   animateBorder,
@@ -164,9 +158,7 @@ export default function StickyNoteCard({
       data-note-id={note.id}
       className={`absolute rounded-2xl border shadow-xl transition-shadow ${
         selected ? "border-slate-900 shadow-2xl" : "border-black/10"
-      } ${
-        animateBorder ? "animate-note-border" : ""
-      }`}
+      } ${animateBorder ? "animate-note-border" : ""}`}
       style={{
         left: note.x,
         top: note.y,
@@ -179,7 +171,6 @@ export default function StickyNoteCard({
         onSelect(note.id, event.ctrlKey || event.metaKey)
       }}
     >
-      {/* Activity Indicator */}
       <ActivityIndicator itemType="note" itemName={note.text.slice(0, 20) || "Untitled"} />
 
       <div
@@ -236,3 +227,5 @@ export default function StickyNoteCard({
     </div>
   )
 }
+
+export default memo(StickyNoteCard)
