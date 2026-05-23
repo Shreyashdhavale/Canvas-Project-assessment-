@@ -15,8 +15,8 @@ npm run dev
 - TypeScript
 - Tailwind CSS
 - Zustand
-- dnd-kit
 - Framer Motion
+- lucide-react(icons)
 
 ## Project Architecture
 
