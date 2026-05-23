@@ -22,7 +22,7 @@ type CanvasShapeProps = {
   draft?: boolean
   zoom: number
   animateBorder?: boolean
-  onSelect: (shapeId: string) => void
+  onSelect: (shapeId: string, additive?: boolean) => void
   onUpdate: (shapeId: string, updates: Partial<CanvasShape>) => void
 }
 
@@ -45,23 +45,6 @@ function getShapeBox(shape: CanvasShape) {
     width: shape.width,
     height: shape.height,
   }
-}
-
-function createRectangleOrCircle(shape: CanvasShape) {
-  if (shape.type === "line") return null
-
-  const borderRadius = shape.type === "circle" ? "9999px" : "18px"
-
-  return (
-    <div
-      className="absolute inset-0"
-      style={{
-        borderRadius,
-        backgroundColor: shape.fill,
-        border: `${shape.strokeWidth}px solid ${shape.stroke}`,
-      }}
-    />
-  )
 }
 
 export default function CanvasShapeCard({
@@ -152,8 +135,8 @@ export default function CanvasShapeCard({
     }
   }, [onUpdate, shape.id, zoom])
 
-  const handleMoveStart = (clientX: number, clientY: number) => {
-    onSelect(shape.id)
+  const handleMoveStart = (clientX: number, clientY: number, additive = false) => {
+    onSelect(shape.id, additive)
 
     dragStateRef.current = {
       startX: clientX,
@@ -168,7 +151,7 @@ export default function CanvasShapeCard({
   const handleMoveMouseDown = (event: React.MouseEvent<Element>) => {
     event.preventDefault()
     event.stopPropagation()
-    handleMoveStart(event.clientX, event.clientY)
+    handleMoveStart(event.clientX, event.clientY, event.ctrlKey || event.metaKey)
   }
 
   const handleMoveTouchStart = (event: React.TouchEvent<Element>) => {
@@ -179,8 +162,8 @@ export default function CanvasShapeCard({
     handleMoveStart(touch.clientX, touch.clientY)
   }
 
-  const handleResizeStart = (clientX: number, clientY: number) => {
-    onSelect(shape.id)
+  const handleResizeStart = (clientX: number, clientY: number, additive = false) => {
+    onSelect(shape.id, additive)
 
     resizeStateRef.current = {
       startX: clientX,
@@ -195,7 +178,7 @@ export default function CanvasShapeCard({
   const handleResizeMouseDown = (event: React.MouseEvent<Element>) => {
     event.preventDefault()
     event.stopPropagation()
-    handleResizeStart(event.clientX, event.clientY)
+    handleResizeStart(event.clientX, event.clientY, event.ctrlKey || event.metaKey)
   }
 
   const handleResizeTouchStart = (event: React.TouchEvent<Element>) => {
@@ -216,11 +199,6 @@ export default function CanvasShapeCard({
         width: Math.max(box.width, isLine ? MIN_LINE_SIZE : MIN_BOX_SIZE),
         height: Math.max(box.height, isLine ? MIN_LINE_SIZE : MIN_BOX_SIZE),
       }}
-      onMouseDown={(event) => {
-        if (draft) return
-        event.stopPropagation()
-        onSelect(shape.id)
-      }}
     >
       {/* Activity Indicator */}
       {!draft && (
@@ -236,8 +214,7 @@ export default function CanvasShapeCard({
           className="absolute inset-0 h-full w-full overflow-visible"
           viewBox={`0 0 ${Math.max(box.width, MIN_LINE_SIZE)} ${Math.max(box.height, MIN_LINE_SIZE)}`}
           preserveAspectRatio="none"
-          onMouseDown={handleMoveMouseDown}
-          onTouchStart={handleMoveTouchStart}
+          style={{ pointerEvents: "none" }}
         >
           <line
             x1={shape.x1 - box.x}
@@ -247,6 +224,9 @@ export default function CanvasShapeCard({
             stroke={shape.stroke}
             strokeWidth={lineStrokeWidth}
             strokeLinecap="round"
+            style={{ pointerEvents: "stroke", cursor: "grab" }}
+            onMouseDown={handleMoveMouseDown}
+            onTouchStart={handleMoveTouchStart}
           />
           {selected && !draft ? (
             <circle
@@ -263,17 +243,51 @@ export default function CanvasShapeCard({
           ) : null}
         </svg>
       ) : (
-        <div
-          className={`absolute inset-0 ${selected ? "ring-2 ring-slate-900/70" : ""}`}
-          style={{
-            borderRadius: shape.type === "circle" ? "9999px" : "18px",
-            backgroundColor: shape.fill,
-            border: `${shape.strokeWidth}px solid ${shape.stroke}`,
-          }}
-          onMouseDown={handleMoveMouseDown}
-          onTouchStart={handleMoveTouchStart}
-        />
+        <svg
+          className="absolute inset-0 h-full w-full overflow-visible"
+          viewBox={`0 0 ${Math.max(shape.width, MIN_BOX_SIZE)} ${Math.max(shape.height, MIN_BOX_SIZE)}`}
+          preserveAspectRatio="none"
+          style={{ pointerEvents: "none" }}
+        >
+          {shape.type === "circle" ? (
+            <ellipse
+              cx={shape.width / 2}
+              cy={shape.height / 2}
+              rx={shape.width / 2 - shape.strokeWidth / 2}
+              ry={shape.height / 2 - shape.strokeWidth / 2}
+              fill={shape.fill}
+              stroke={shape.stroke}
+              strokeWidth={shape.strokeWidth}
+              style={{ pointerEvents: "stroke", cursor: "grab" }}
+              onMouseDown={handleMoveMouseDown}
+              onTouchStart={handleMoveTouchStart}
+            />
+          ) : (
+            <rect
+              x={shape.strokeWidth / 2}
+              y={shape.strokeWidth / 2}
+              width={Math.max(0, shape.width - shape.strokeWidth)}
+              height={Math.max(0, shape.height - shape.strokeWidth)}
+              rx={16}
+              ry={16}
+              fill={shape.fill}
+              stroke={shape.stroke}
+              strokeWidth={shape.strokeWidth}
+              style={{ pointerEvents: "stroke", cursor: "grab" }}
+              onMouseDown={handleMoveMouseDown}
+              onTouchStart={handleMoveTouchStart}
+            />
+          )}
+        </svg>
       )}
+
+      {!draft && selected && shape.type !== "line" ? (
+        <div
+          className={`pointer-events-none absolute inset-0 border border-slate-900/45 border-dashed ${
+            shape.type === "circle" ? "rounded-full" : "rounded-[18px]"
+          }`}
+        />
+      ) : null}
 
       {!draft && selected && shape.type !== "line" ? (
         <button

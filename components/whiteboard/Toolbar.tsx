@@ -6,6 +6,8 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  Undo2,
+  Redo2,
   Crosshair,
   Trash2,
   RefreshCw,
@@ -23,6 +25,10 @@ type ToolbarProps = {
   onZoomIn: () => void
   onZoomOut: () => void
   onResetZoom: () => void
+  onUndo: () => void
+  onRedo: () => void
+  canUndo: boolean
+  canRedo: boolean
   onResetBoard: () => void
   onDeleteSelected: () => void
   onCenterView: () => void
@@ -38,6 +44,10 @@ const Toolbar = forwardRef<HTMLDivElement, ToolbarProps>(
       onZoomIn,
       onZoomOut,
       onResetZoom,
+      onUndo,
+      onRedo,
+      canUndo,
+      canRedo,
       onResetBoard,
       onDeleteSelected,
       onCenterView,
@@ -92,6 +102,22 @@ const Toolbar = forwardRef<HTMLDivElement, ToolbarProps>(
           label="Reset Zoom"
           onClick={onResetZoom}
           title="Reset Zoom"
+        />
+
+        <ToolbarButton
+          icon={<Undo2 size={16} className="sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6" />}
+          label="Undo"
+          onClick={onUndo}
+          disabled={!canUndo}
+          title="Undo (Ctrl/Cmd+Z)"
+        />
+
+        <ToolbarButton
+          icon={<Redo2 size={16} className="sm:h-4 sm:w-4 md:h-5 md:w-5 lg:h-6 lg:w-6" />}
+          label="Redo"
+          onClick={onRedo}
+          disabled={!canRedo}
+          title="Redo (Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z)"
         />
 
         {/* Section 3: Navigation */}
