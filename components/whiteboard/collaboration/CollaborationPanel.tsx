@@ -1,6 +1,6 @@
 "use client"
 
-import { Users, Activity, Zap } from "lucide-react"
+import { Users, Activity } from "lucide-react"
 import { useCollaborationStore } from "@/store/collaborationStore"
 
 export default function CollaborationPanel() {
@@ -11,7 +11,6 @@ export default function CollaborationPanel() {
 
   return (
     <div className="absolute right-4 top-20 z-40 w-72 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur">
-      {/* Header */}
       <div className="mb-4 flex items-center gap-2 border-b border-slate-200 pb-3">
         <Users size={18} className="text-slate-600" />
         <h2 className="text-sm font-semibold text-slate-900">Collaborators</h2>
@@ -21,7 +20,6 @@ export default function CollaborationPanel() {
         </span>
       </div>
 
-      {/* Online Users */}
       <div className="mb-4 space-y-2">
         {collaborators.map((collaborator) => {
           const editingState = editingStates.find((e) => e.collaboratorId === collaborator.id)
@@ -66,7 +64,6 @@ export default function CollaborationPanel() {
                 )}
               </div>
 
-              {/* User color indicator */}
               <div
                 className="h-3 w-3 rounded-full border border-slate-200"
                 style={{ backgroundColor: collaborator.color }}
@@ -76,7 +73,6 @@ export default function CollaborationPanel() {
         })}
       </div>
 
-      {/* Activity Feed */}
       <div className="border-t border-slate-200 pt-3">
         <div className="mb-2 flex items-center gap-2">
           <Activity size={16} className="text-slate-600" />

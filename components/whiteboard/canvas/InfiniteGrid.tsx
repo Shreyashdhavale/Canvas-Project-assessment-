@@ -20,7 +20,6 @@ export default function InfiniteGrid() {
         `,
       }}
     >
-      {/* MAJOR GRID */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{

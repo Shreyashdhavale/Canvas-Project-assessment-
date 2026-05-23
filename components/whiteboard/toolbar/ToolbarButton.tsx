@@ -25,7 +25,7 @@ export default function ToolbarButton({
   const variantStyles: Record<string, string> = {
     default: "border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100",
     primary: "bg-slate-900 text-white border-0 hover:bg-slate-700",
-    danger:  "border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100",
+    danger: "border-slate-200 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100",
     warning: "border-slate-200 text-slate-500 hover:bg-amber-50 hover:text-amber-600",
   }
 

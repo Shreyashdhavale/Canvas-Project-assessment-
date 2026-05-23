@@ -17,7 +17,6 @@ const SingleCursor = memo(
         mass: 0.5,
       }}
     >
-      {/* Cursor arrow */}
       <svg
         className="drop-shadow-lg"
         width="24"
@@ -32,7 +31,6 @@ const SingleCursor = memo(
         <path d="M3 3l7.07 18.97L12.58 13.4L20 20.97L3 3z" fill={color} />
       </svg>
 
-      {/* User label */}
       <motion.div
         className="absolute left-6 top-1 whitespace-nowrap rounded-full px-2 py-1 text-xs font-semibold text-white shadow-lg"
         style={{ backgroundColor: color }}
@@ -49,7 +47,6 @@ const SingleCursor = memo(
 SingleCursor.displayName = "SingleCursor"
 
 export default function CursorLayer() {
-  // Get collaborators and memoize the selector result to prevent infinite loops
   const collaborators = useCollaborationStore((state) => state.collaborators)
 
   const collaboratorData = useMemo(

@@ -13,10 +13,10 @@ type ShapesMenuProps = {
 }
 
 const shapeTools: Array<{ tool: ShapeKind | null; label: string; icon: React.ReactNode }> = [
-  { tool: null,          label: "Select",    icon: <MousePointer size={16} /> },
-  { tool: "line",        label: "Line",      icon: <Minus size={16} /> },
-  { tool: "rectangle",   label: "Rectangle", icon: <Square size={16} /> },
-  { tool: "circle",      label: "Circle",    icon: <Circle size={16} /> },
+  { tool: null, label: "Select", icon: <MousePointer size={16} /> },
+  { tool: "line", label: "Line", icon: <Minus size={16} /> },
+  { tool: "rectangle", label: "Rectangle", icon: <Square size={16} /> },
+  { tool: "circle", label: "Circle", icon: <Circle size={16} /> },
 ]
 
 export default function ShapesMenu({

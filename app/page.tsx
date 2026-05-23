@@ -1,4 +1,4 @@
-import Canvas from "@/components/whiteboard/Canvas"
+import Canvas from "@/components/whiteboard/canvas/Canvas"
 
 export default function Home() {
   return <Canvas />
