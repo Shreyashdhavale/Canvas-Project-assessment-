@@ -62,6 +62,7 @@ export default function CanvasShapeCard({
   const box = getShapeBox(shape)
   const isLine = shape.type === "line"
   const lineStrokeWidth = shape.strokeWidth + (selected ? 1 : 0)
+  const touchHitStrokeWidth = Math.max(18 / Math.max(zoom, 0.2), shape.strokeWidth + 8)
 
   useEffect(() => {
     const handleMove = (clientX: number, clientY: number) => {
@@ -221,6 +222,18 @@ export default function CanvasShapeCard({
             y1={shape.y1 - box.y}
             x2={shape.x2 - box.x}
             y2={shape.y2 - box.y}
+            stroke="transparent"
+            strokeWidth={touchHitStrokeWidth}
+            strokeLinecap="round"
+            style={{ pointerEvents: "stroke", cursor: "grab" }}
+            onMouseDown={handleMoveMouseDown}
+            onTouchStart={handleMoveTouchStart}
+          />
+          <line
+            x1={shape.x1 - box.x}
+            y1={shape.y1 - box.y}
+            x2={shape.x2 - box.x}
+            y2={shape.y2 - box.y}
             stroke={shape.stroke}
             strokeWidth={lineStrokeWidth}
             strokeLinecap="round"
@@ -249,6 +262,35 @@ export default function CanvasShapeCard({
           preserveAspectRatio="none"
           style={{ pointerEvents: "none" }}
         >
+          {shape.type === "circle" ? (
+            <ellipse
+              cx={shape.width / 2}
+              cy={shape.height / 2}
+              rx={Math.max(0, shape.width / 2 - shape.strokeWidth / 2)}
+              ry={Math.max(0, shape.height / 2 - shape.strokeWidth / 2)}
+              fill="transparent"
+              stroke="transparent"
+              strokeWidth={touchHitStrokeWidth}
+              style={{ pointerEvents: "stroke", cursor: "grab" }}
+              onMouseDown={handleMoveMouseDown}
+              onTouchStart={handleMoveTouchStart}
+            />
+          ) : (
+            <rect
+              x={shape.strokeWidth / 2}
+              y={shape.strokeWidth / 2}
+              width={Math.max(0, shape.width - shape.strokeWidth)}
+              height={Math.max(0, shape.height - shape.strokeWidth)}
+              rx={16}
+              ry={16}
+              fill="transparent"
+              stroke="transparent"
+              strokeWidth={touchHitStrokeWidth}
+              style={{ pointerEvents: "stroke", cursor: "grab" }}
+              onMouseDown={handleMoveMouseDown}
+              onTouchStart={handleMoveTouchStart}
+            />
+          )}
           {shape.type === "circle" ? (
             <ellipse
               cx={shape.width / 2}

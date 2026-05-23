@@ -27,6 +27,17 @@ type BoardHistorySnapshot = {
   shapes: CanvasShape[]
 }
 
+type TouchPoint = {
+  x: number
+  y: number
+}
+
+type PinchState = {
+  initialDistance: number
+  initialZoom: number
+  worldPointAtMidpoint: TouchPoint
+}
+
 const SHAPE_STROKE = "#334155"
 const SHAPE_FILL = "rgba(148, 163, 184, 0.18)"
 const DEFAULT_RECTANGLE_WIDTH = 220
@@ -83,6 +94,7 @@ export default function Canvas() {
     x: 0,
     y: 0,
   })
+  const pinchStateRef = useRef<PinchState | null>(null)
 
   useEffect(() => {
     viewportRef.current = viewport
@@ -164,6 +176,19 @@ export default function Canvas() {
       y: (rect.height / 2 - currentViewport.y) / currentViewport.zoom,
     }
   }
+
+  const getTouchPoint = (touch: React.Touch): TouchPoint => ({
+    x: touch.clientX,
+    y: touch.clientY,
+  })
+
+  const getTouchDistance = (first: TouchPoint, second: TouchPoint) =>
+    Math.hypot(second.x - first.x, second.y - first.y)
+
+  const getTouchMidpoint = (first: TouchPoint, second: TouchPoint): TouchPoint => ({
+    x: (first.x + second.x) / 2,
+    y: (first.y + second.y) / 2,
+  })
 
   const insertShapeAtPoint = (tool: ShapeKind, x: number, y: number) => {
     if (tool === "line") {
@@ -324,9 +349,30 @@ export default function Canvas() {
   }
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length !== 1) return
-    const touch = e.touches[0]
-    handlePanStart(touch.clientX, touch.clientY)
+    if (e.touches.length === 2) {
+      const first = getTouchPoint(e.touches[0])
+      const second = getTouchPoint(e.touches[1])
+      const midpoint = getTouchMidpoint(first, second)
+      const currentViewport = viewportRef.current
+
+      pinchStateRef.current = {
+        initialDistance: getTouchDistance(first, second),
+        initialZoom: currentViewport.zoom,
+        worldPointAtMidpoint: {
+          x: (midpoint.x - currentViewport.x) / currentViewport.zoom,
+          y: (midpoint.y - currentViewport.y) / currentViewport.zoom,
+        },
+      }
+
+      setIsPanning(false)
+      return
+    }
+
+    if (e.touches.length === 1) {
+      pinchStateRef.current = null
+      const touch = e.touches[0]
+      handlePanStart(touch.clientX, touch.clientY)
+    }
   }
 
   // -----------------------------
@@ -358,6 +404,63 @@ export default function Canvas() {
 
   const handleMouseUp = () => {
     setIsPanning(false)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const first = getTouchPoint(e.touches[0])
+      const second = getTouchPoint(e.touches[1])
+      const midpoint = getTouchMidpoint(first, second)
+      const distance = getTouchDistance(first, second)
+      const pinchState = pinchStateRef.current
+
+      if (!pinchState) {
+        const currentViewport = viewportRef.current
+
+        pinchStateRef.current = {
+          initialDistance: Math.max(distance, 1),
+          initialZoom: currentViewport.zoom,
+          worldPointAtMidpoint: {
+            x: (midpoint.x - currentViewport.x) / currentViewport.zoom,
+            y: (midpoint.y - currentViewport.y) / currentViewport.zoom,
+          },
+        }
+
+        return
+      }
+
+      const zoomRatio = distance / Math.max(pinchState.initialDistance, 1)
+      let nextZoom = pinchState.initialZoom * zoomRatio
+      nextZoom = Math.min(Math.max(nextZoom, 0.2), 4)
+
+      setIsPanning(false)
+      setViewport({
+        zoom: nextZoom,
+        x: midpoint.x - pinchState.worldPointAtMidpoint.x * nextZoom,
+        y: midpoint.y - pinchState.worldPointAtMidpoint.y * nextZoom,
+      })
+      return
+    }
+
+    if (pinchStateRef.current && e.touches.length < 2) {
+      pinchStateRef.current = null
+    }
+
+    if (e.touches.length !== 1 || !isPanning) return
+
+    const touch = e.touches[0]
+    handleMouseMove({
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+    } as React.MouseEvent)
+  }
+
+  const handleTouchEnd = () => {
+    if (pinchStateRef.current) {
+      pinchStateRef.current = null
+    }
+
+    handleMouseUp()
   }
 
   // -----------------------------
@@ -798,15 +901,8 @@ export default function Canvas() {
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onTouchStart={handleTouchStart}
-      onTouchMove={(e) => {
-        if (e.touches.length !== 1) return
-        const touch = e.touches[0]
-        handleMouseMove({
-          clientX: touch.clientX,
-          clientY: touch.clientY,
-        } as React.MouseEvent)
-      }}
-      onTouchEnd={handleMouseUp}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
       onWheel={handleWheel}
       style={{ touchAction: "none" }}
     >
