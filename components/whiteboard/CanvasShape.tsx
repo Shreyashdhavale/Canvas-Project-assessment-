@@ -64,6 +64,8 @@ export default function CanvasShapeCard({
   const lineStrokeWidth = shape.strokeWidth + (selected ? 1 : 0)
   const touchHitStrokeWidth = Math.max(18 / Math.max(zoom, 0.2), shape.strokeWidth + 8)
 
+  const endpointHandleRadius = 8 / Math.max(zoom, 0.2)
+
   useEffect(() => {
     const handleMove = (clientX: number, clientY: number) => {
       if (dragStateRef.current) {
@@ -245,11 +247,11 @@ export default function CanvasShapeCard({
             <circle
               cx={shape.x2 - box.x}
               cy={shape.y2 - box.y}
-              r={6 / zoom}
+              r={endpointHandleRadius}
               fill="#ffffff"
               stroke={shape.stroke}
-              strokeWidth={2 / zoom}
-              style={{ cursor: "nwse-resize" }}
+              strokeWidth={2 / Math.max(zoom, 0.2)}
+              style={{ cursor: "grab", pointerEvents: "all" }}
               onMouseDown={handleResizeMouseDown}
               onTouchStart={handleResizeTouchStart}
             />
